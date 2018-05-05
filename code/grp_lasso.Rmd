@@ -1,0 +1,118 @@
+---
+title: "Group Lasso with Sparse Data"
+author: "MEMadsen"
+date: "May 2, 2018"
+output: html_document
+---
+
+
+```{r setup,echo=FALSE,message=FALSE, results='hide'}
+st.time.0 <- Sys.time()
+
+## Optional -- Install Packages
+#library(devtools)
+#install_github("vqv/ggbiplot")
+
+# Load Packages
+pkg <- c("bitops", "caret", "corrplot", "DataExplorer", "factoextra", 
+         "ggbiplot", "gglasso", "ggplot2", "glmnet", "h2o",
+         "knitr", "markdown", "mlbench","RColorBrewer", "RCurl", "rjson",
+         "tools", "zoo", "rlang")
+
+sapply(pkg, require, character.only = TRUE)
+
+knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=8, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", cache = TRUE, cache.lazy = TRUE, tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
+```
+
+```{r proj_dir}
+ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
+DATA.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/data/" 
+# DATA.DIR <- paste(ROOT.DIR,"data",sep="/")
+
+```
+
+```{r data, echo=TRUE} 
+# Import Data
+data(Sonar)
+#fileName <- paste("Sonar", "sonar.csv", sep="")
+write.csv(Sonar, file = paste(DATA.DIR, "sonar.csv", sep="") )
+
+
+
+# reomve rows with missing values
+# Sonar_completeCase = Sonar[complete.cases(Sonar),]
+# Sonar = Sonar[sample(nrow(Sonar)),]
+
+# Assign Predictors and Response
+y = Sonar$Class
+X = Sonar[,-61]
+```
+
+# Exploratory Data Analysis
+
+## Initial Visualization
+
+Without knowing anything about the data, my first 3 tasks are almost always:
+
+* Are there missing values, and what is the missing data profile?   
+* How does the categorical frequency for each discrete variable look like?  
+* What is the distribution of each continuous variable?
+
+
+The plot of missing data is not displayed because there is no missing data.  
+
+```{r plt_missing}
+# plot_missing(Sonar)
+```
+
+### Categorical Frequency
+
+
+
+```{r plt_bar}
+plot_bar(Sonar)
+```
+
+### Continuous Distribution
+
+Univariate histograms.
+
+```{r plt_cont}
+plot_histogram(Sonar)
+```
+
+Boxplots by Class label.
+
+```{r plt_boxplot}
+plot_boxplot(Sonar, by="Class")
+
+# plot_scatterplot(Sonar, by="Class")
+```
+
+
+### Correlation 
+
+```{r}
+
+plot_correlation(Sonar )
+
+```
+
+
+### Hierarchial Clustering
+
+```{r cluster_hier}
+# Dissimilarity matrix
+d = dist(t(X), method = "euclidean")
+
+# Hierarchical clustering using Complete Linkage
+hc1 = hclust(d, method = "complete" )
+
+# Apply Elbow rule
+fviz_nbclust(X, FUN = hcut, method = "wss") # It seems 4 - 6 groups may be appropriate
+
+# Plot dendrogram with 5 selected groups
+plot(hc1, cex = 0.6, hang = -1)
+rect.hclust(hc1, k = 5, border = 2:5)
+```
+
