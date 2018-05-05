@@ -29,14 +29,13 @@ vignettes/*.pdf
 # knitr and R markdown default cache directories
 */code/grp_lasso_cache/*
 !*/code/grp_lasso_cache/html/__packages
-/*_cache
-/*_cache/
-/cache/
-# *_cache/*
+#/*_cache/
+#/cache/
 *.RData
 *.rdb
 *.rdx
 
+*/code/grp_lasso_files/*
 #/figure-html/
 #*figure-html/*
 /*-html
