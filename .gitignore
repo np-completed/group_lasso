@@ -6,6 +6,8 @@
 
 # Session Data files
 .RData
+*.rdb
+*.rdx
 
 # Example code in package build process
 *-Ex.R
@@ -27,18 +29,11 @@ vignettes/*.pdf
 .httr-oauth
 
 # knitr and R markdown default cache directories
-/code/grp_lasso_cache/*
-!*/code/grp_lasso_cache/html/__packages
-#/*_cache/
-#/cache/
-*.RData
-*.rdb
-*.rdx
+/code/grp_lasso_cache/html/*
+!/code/grp_lasso_cache/html/__packages
 
 /code/grp_lasso_files/figure-html/*.png
 !/code/grp_lasso_files/figure-html/cluster_hier*
-#/figure-html/
-#*figure-html/*
 /*-html
 /*-html/
 
