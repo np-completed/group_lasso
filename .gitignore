@@ -30,8 +30,13 @@ vignettes/*.pdf
 /*_cache
 /*_cache/
 /cache/
+# *_cache/*
+.RData
+.rdb
+.rdx
 
 /figure-html/
+*-html/*
 /*-html
 /*-html/
 
