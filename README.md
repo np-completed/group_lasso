@@ -15,5 +15,6 @@ git push -u origin master
 ```
 # requirements
 
-## HTML R library for group_lasso
+## R libraries
+The knitr md file `group_lasso` used to generate HTML output.
 `group_lasso/code/grp_lasso_cache/html/__packages`
