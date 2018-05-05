@@ -35,7 +35,7 @@ vignettes/*.pdf
 *.rdb
 *.rdx
 
-/code/grp_lasso_files/*
+/code/grp_lasso_files/figure-html/*.png
 !/code/grp_lasso_files/figure-html/cluster_hier*
 #/figure-html/
 #*figure-html/*
