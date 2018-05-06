@@ -4,7 +4,8 @@
 This README file shows the technical implementation for statistical regularization. All discussion, results and background are on display as PDF or HTML docs, associated with a `.Rmd` file from `R`.
 
  Markup : - [] Setup the WIKI page of GitHub for this project.
-          - [] Remove missing data command `Sonar_completeCase = Sonar[complete.cases(Sonar),]` , bc there is no missing data.
+
+- [] Remove missing data command `Sonar_completeCase = Sonar[complete.cases(Sonar),]` , bc there is no missing data.
           - [] Migrate to `sparklyr` for utilizing `H2O`.
           - [] Group YML file for parent-child docs
 
