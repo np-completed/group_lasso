@@ -28,9 +28,14 @@ git remote add origin https://github.com/prfrl/group_lasso.git
 git push -u origin master
 ```
 
-## GitHub directories
+## Project Directories
 
-The directory tree is logically formatted. All files are placed relative to the root, where the `.gitignore` file is located.
+THe GitHub directories follow my local project directories. See
+ `directory_structure.png` to see a picture.
+
+The directory tree is logically formatted, using best practices (maybe).
+All files are placed relative to the root, where the `.gitignore` file
+is located.
 
 
 * code
