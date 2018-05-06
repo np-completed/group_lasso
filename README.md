@@ -71,5 +71,12 @@ There are three main ways to run roxygen: https://cran.r-project.org/web/package
 Ideally a main YML file is used and pulled from all existing parent child files.
 This has not happened yet.
 
+## Parent File Output from Multiple Child Files
+
+Simple solution is to run `source(foo_bar.R)` from the parent file. this
+ is simple but not flexible. Output of tables and plots can be formatted
+ using HTML from the plot figures. Variables are callable without too much
+ fuss.
+
 Compiling repors from R scripts:
  https://rmarkdown.rstudio.com/articles_report_from_r_script.html
