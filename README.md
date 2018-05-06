@@ -51,10 +51,11 @@ R files formatted using roxygen can be rendered using pandoc, command line
  arguments using a bash shell OR R. Most markdown effects persist, however
  the main two changes are:
 
-1.  texts in roxygen comments #' are preserved as normal texts
+1.  Plain texts in roxygen comments `#'` are preserved as normal texts
   (may contain inline R code)
 
-1. chunk options are written after #+ or #-, e.g. #+ chunk-label, opt1=value1, opt2=value2
+1. chunk options are written after `#+` or `#-`, e.g.
+`#+ chunk-label, opt1=value1, opt2=value2`
 
 There are three main ways to run roxygen: https://cran.r-project.org/web/packages/roxygen2/vignettes/roxygen2.html
 
