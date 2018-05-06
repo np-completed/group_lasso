@@ -43,3 +43,21 @@ The directory tree is logically formatted. All files are placed relative to the 
 ## R libraries
 The knitr md file `group_lasso` generated the HTML output using R libraries:
 `group_lasso/code/grp_lasso_cache/html/__packages` . All bleeding edge packages also have install directions shown in the `.Rmd` file. Typically `library(devtools)` and `install_github(foo_bar/magick)` .
+
+
+# Roxygen formatting
+
+R files formatted using roxygen can be rendered using pandoc, command line
+ arguments using a bash shell OR R. Most markdown effects persist, however
+ the main two changes are:
+
+1.  texts in roxygen comments #' are preserved as normal texts
+  (may contain inline R code)
+
+1. chunk options are written after #+ or #-, e.g. #+ chunk-label, opt1=value1, opt2=value2
+
+There are three main ways to run roxygen: https://cran.r-project.org/web/packages/roxygen2/vignettes/roxygen2.html
+
+1. `roxygen2::roxygenise()`
+1. `devtools::document()` , if you’re using devtools
+1. `Ctrl + Shift + D`, if you’re using RStudio.
