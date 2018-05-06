@@ -5,6 +5,7 @@ ggplot2
 caret
 corrplot
 DataExplorer
+dplyr
 factoextra
 plyr
 scales
@@ -20,5 +21,16 @@ mlbench
 RColorBrewer
 RCurl
 rjson
+rmarkdown
 zoo
 rlang
+AppliedPredictiveModeling
+pROC
+gplots
+ROCR
+statmod
+mvtnorm
+modeltools
+sandwich
+strucchange
+party

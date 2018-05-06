@@ -5,7 +5,7 @@
 .Rapp.history
 
 # Session Data files
-.RData
+*.RData
 *.rdb
 *.rdx
 

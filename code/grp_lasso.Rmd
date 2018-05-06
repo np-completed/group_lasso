@@ -2,42 +2,57 @@
 title: "Group Lasso with Sparse Data"
 author: "MEMadsen"
 date: "May 2, 2018"
-output: html_document
+output: 
+  html_document: 
+    fig_caption: yes
+    number_sections: yes
+    toc: yes
 ---
 
 
-```{r setup,echo=FALSE,message=FALSE, results='hide'}
+# Document Updated last:
+
+```{r stTime, echo=TRUE}
 st.time.0 <- Sys.time()
+st.time.0 
+```
+
+
+
+```{r setup,echo=FALSE,message=FALSE, results='hide'}
 
 ## Optional -- Install Packages
 #library(devtools)
 #install_github("vqv/ggbiplot")
 
 # Load Packages
-pkg <- c("bitops", "caret", "corrplot", "DataExplorer", "factoextra", 
+pkg <- c("bitops", "caret", "corrplot", "DataExplorer", "dplyr", "factoextra", 
          "ggbiplot", "gglasso", "ggplot2", "glmnet", "h2o",
-         "knitr", "markdown", "mlbench","RColorBrewer", "RCurl", "rjson",
+         "knitr", "markdown", "mlbench","RColorBrewer", "RCurl", "rjson", "rmarkdown",
          "tools", "zoo", "rlang")
 
 sapply(pkg, require, character.only = TRUE)
 
 knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=8, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", cache = TRUE, cache.lazy = TRUE, tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
+
+# opts_knit$set(self.contained=FALSE)
+
 ```
 
 ```{r proj_dir}
 ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
-DATA.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/data/" 
-# DATA.DIR <- paste(ROOT.DIR,"data",sep="/")
-
+# DATA.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/data/" 
+DATA.DIR <- paste(ROOT.DIR,"data",sep="/")
+CODE.DIR <- paste(ROOT.DIR, "code", sep="")
 ```
 
 ```{r data, echo=TRUE} 
 # Import Data
-data(Sonar)
-#fileName <- paste("Sonar", "sonar.csv", sep="")
-write.csv(Sonar, file = paste(DATA.DIR, "sonar.csv", sep="") )
-
-
+# data(Sonar)
+# write.csv(Sonar, file = paste(DATA.DIR, "sonar.csv", sep="") )
+#
+Sonar <- read.csv(file = paste(DATA.DIR, "sonar.csv", sep="/") )
+Sonar <- select(Sonar , -X)
 
 # reomve rows with missing values
 # Sonar_completeCase = Sonar[complete.cases(Sonar),]
@@ -116,3 +131,96 @@ plot(hc1, cex = 0.6, hang = -1)
 rect.hclust(hc1, k = 5, border = 2:5)
 ```
 
+
+# Machine Learning
+
+The machine learning package H2O is leveraged using the R interface. 
+
+## Embed machine learning file into main file. 
+
+```{r deepLearning_main, cache=FALSE, echo=TRUE,results='hide'}
+## Read R Script
+# source("deep_learn_h2o.R")
+# source(file = paste(CODE.DIR, "deep_learn_h2o.R", sep="/") )
+```
+
+
+
+## Child doc: Spin
+
+The main file `grp_lasso.Rmd` imports a R script(s) and embeds into the main doc. The outputs can be messy or buggy but there are many benefits to logically distributing long files.
+
+This child file `deep_learn_h20_roxy.R` uses roxygen formatting on a raw R file.
+
+```{r spin_DeepLearning, echo=TRUE, cache=FALSE}
+#spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/spinner_test.R')
+{{knitr::spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/deep_learn_h20_roxy.R')}}
+```
+
+
+
+# References 
+
+
+* [H2O Deep Learning][https://github.com/ahoffer/badger-beats] Liberal use of this GitHub page is utilized for the DeepLearning/H2O/Machine Learning section of this document.
+
+
+## End Time 
+
+Document Settings 
+
+```{r endTime, echo=TRUE}
+end.time.0 <- Sys.time()
+end.time.0 
+
+end.time.0  - st.time.0 
+
+getwd()
+
+list.files(getwd())
+sessionInfo()
+
+```
+
+
+## Child doc  alternatives
+
+Import R script and embed into main doc. Several options are available with mixed utility.
+
+These are not used here but are useful, potentially at a later date.
+
+```{r, echo=TRUE, results='asis'}
+  # cat(knit_child(text = readLines('/media/disc/Megasync/R/regularization/group_lasso/code/deep_learn._h2o.R', quiet = TRUE)) 
+```
+
+
+```{r deepLearning_solo, cache=FALSE, echo=TRUE,results='markup'}
+# rmarkdown::render("deep_learn_h2o.R")
+
+```
+
+```{r, echo=TRUE}
+# child_docs <- "deep_learn_h2o.R"
+```
+
+### Run Hook as:
+```
+r, child = child_docs
+```
+
+### Call output to print
+
+Config output
+
+```{r}
+# h2o
+```
+
+
+## Output machine learning file separate from main file. 
+
+## Hook Import of file
+
+```
+r, child='/media/disc/Megasync/R/regularization/group_lasso/code/deep_learn_h2o.R'
+```
