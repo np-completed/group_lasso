@@ -2,8 +2,14 @@
 #' 
 
 #+ importLibraries, echo=TRUE, results='hide',cache=FALSE
-pkg <- c("AppliedPredictiveModeling", "bitops", "caret", "dplyr", "ggbiplot", "h2o", "mlbench", "pROC", "RCurl", "rjson", "ROCR", "statmod", "tools")
-sapply(pkg, require, character.only = TRUE)
+# Download packages that H2O depends on.
+pkgs <- c("pROC", "RCurl","jsonlite")
+for (pkg in pkgs) {
+  if (! (pkg %in% rownames(installed.packages()))) { install.packages(pkg) }
+}
+# Load libs
+pkg.load <- c("AppliedPredictiveModeling", "bitops", "caret", "dplyr", "ggbiplot", "h2o", "mlbench", "pROC", "RCurl", "rjson", "ROCR", "statmod", "tools")
+sapply(pkg.load, require, character.only = TRUE)
 
 
 
@@ -15,8 +21,10 @@ source("/media/disc/Megasync/R/regularization/group_lasso/code/helper_h2o.R")
 
 
 #+ directory_shorcuts
-ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/code/"
-DATA.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/data/" 
+ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
+DATA.DIR <- paste(ROOT.DIR,"data",sep="")
+CODE.DIR <- paste(ROOT.DIR, "code", sep="")
+
 
 #' ## MAKE RESULTS REPEATABLE
 #' 
@@ -38,21 +46,24 @@ set.seed(seed)
 #' 
 
 #+ h20_config, echo=TRUE, cache=FALSE
-h2o <- h2o.init(nthreads = -1 )
+h2o <- h2o.init(nthreads = -1, max_mem_size = "14g" )
 
 #' LOAD SONAR DATA AND CREATE TRAINING AND TEST SETS ---------------------------
 #' 
 
 #+ data_input_DL
 # data(Sonar)
-pathToData <- paste0(normalizePath(DATA.DIR), "sonar_dl.csv")
+# write.csv(Sonar, file = paste(DATA.DIR, "sonar_dl.csv", sep="/"), row.names=FALSE )
+Sonar <- read.csv(file = paste(DATA.DIR, "sonar_dl.csv", sep="/"))
+
+pathToData <- paste0(normalizePath(DATA.DIR), "/sonar_dl.csv")
 
 #' Load data into an H2O data frame
 #' 
 
 #+ sonarHex, echo=TRUE,cache=FALSE
-# sonar.hex = h2o.importFile("/media/disc/Megasync/R/regularization/group_lasso/data/sonar_dl.csv") 
-sonar.hex <- h2o.importFile(path = pathToData, destination_frame = "dat")
+# sonar.hex = h2o.importFile("/media/disc/Megasync/R/regularization/group_lasso/data/sonar_dl.csv")
+sonar.hex <- h2o.importFile(path = pathToData, destination_frame = "sonar.hex")
 # Convert the H2O data frame into an R data frame for later use.
 sonar.df = as.data.frame(sonar.hex)
 # sonar.df <- select(sonar.df, -C1)
@@ -85,7 +96,8 @@ sonar.test.df = as.data.frame(sonar.test)
 names(sonar.test.df)[classVariableIndex] = "Class"
 
 
-#' ## TRELLIS PLOT ----------------------------------------------------------------
+#' ## TRELLIS PLOT   
+#'  ----------------------------------------------------------------
 #' 
 #' Create a trellis plot using all 60 features. Notice that it is a useless mess.
 #' 
@@ -100,10 +112,9 @@ featurePlot <- featurePlot(
   cex = 0.05,
   auto.key = list(columns = 2) )
 
-#' Extract all x variables
-#' x.vars <- sonar.features %>% select(-C1)
 
-#' PRINCIPAL COMPONENT ANALYSIS OF DATA SET ------------------------------------  
+#' PRINCIPAL COMPONENT ANALYSIS OF DATA SET 
+#' ------------------------------------  
 #' 
 #' Generally, anything with more than 10 features is considered high dimensional data.
 #' Text mining and genomic microarrays have thousands of dimensions and they are the
@@ -116,8 +127,13 @@ featurePlot <- featurePlot(
 sonar.princomp = prcomp(sonar.features, #x.vars,  
                         center = TRUE,
                         scale = TRUE,
+                        #tol=.3, #rank. = 15,
                         retx = TRUE)
-
+sonar.princomp.7 = prcomp(sonar.features, #x.vars,  
+                        center = TRUE,
+                        scale = TRUE,
+                        tol=.4, 
+                        retx = TRUE)
 
 
 #' Plot the first three principal components. Together, the first three
@@ -127,15 +143,17 @@ sonar.princomp = prcomp(sonar.features, #x.vars,
 #' components as features, then 3 features can account for 50% of the information in the
 #' original data set. That means the the first three principle components consume only
 #' 3/60, or just 5% of the space as the original data, but contains almost half the signal.
-#' The upshot is that PCA is a kind of lossy data compression!
+#' The upshot is that PCA is a kind of lossy data compression! 
+#' 
+#' ## PCA Cumulative Variance
+#' 
+#' Look at cumulative proportion of the variance explained by the principle components:
 
 #+ pca_variance, echo=TRUE
-# Look at cumulative proporation of the variance explained by the principle components
-# The first
-summary(sonar.princomp)
+summary(sonar.princomp.7)
 # PCA TRELLIS PLOT ++++++++++++++++++++
 transparentTheme(trans = 0.3)
-numberOfPrincipalComponentsToPlot = 4
+numberOfPrincipalComponentsToPlot = 3
 
 
 #' Plotting the principle components shows us that the rocks and mines have a lot of
@@ -229,22 +247,31 @@ plot(decisionTree.roc)
 #'  An EL combines multiple weak learners into a single storng learner. See bias-variance 
 #'  tradeoff for better understanding.  
 #'  
+#'  1. Gradient Boosted Model
+#'  1. Logistic Regression
+#'  1. Random Forest
 
-#+ ensemble_fit, echo=TRUE, cache=FALSE
-h2o.experiment(h2o.gbm)
+#+ ensemble_fit, echo=TRUE, cache=cacheData
+model.gbm <- h2o.experiment(h2o.gbm)
 # Generalized linear model.
 h2o.experiment(h2o.glm, list(family = "binomial"))
 # Random forest. A good ensemble learner.
 h2o.experiment(h2o.randomForest)
 
-#' ## Deep Learning Model Fit  -----------------------------
+#' ## Deep Learning Model Fit-----------------------------
 #' 
-#' Deep learning can be considered as a neural network that includes extra layers, e.g. 
-#' hidden layers. Raw input is automatically converted to good features. The accuracy
+#' Deep learning (DL) can be considered as a neural network that includes extra hidden layers. These hidden layers account for nonlinear relationships and latent variance. Raw input is automatically converted to good features. The increased accuracy
 #' comes at a computationally expensive cost. Tuning the model parameters will have 
-#' dramatic effects on the accuracy.
+#' dramatic effects on the accuracy. An untuned DL model will generally perform poorly, with low accuracy on test set predictions.
 #' 
 
 
 #+ deep_learning_fit,echo=TRUE,cache=FALSE
-h2o.experiment(h2o.deeplearning)
+dl.fit <- h2o.experiment(h2o.deeplearning)
+
+
+
+#' ## Model Results
+#' 
+#' Comparing performance accuracy from models run in h2o. 
+#' 

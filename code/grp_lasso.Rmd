@@ -5,7 +5,9 @@ date: "May 2, 2018"
 output: 
   html_document: 
     fig_caption: yes
+    keep_md: yes
     number_sections: yes
+    theme: readable
     toc: yes
 ---
 
@@ -26,27 +28,27 @@ st.time.0
 #install_github("vqv/ggbiplot")
 
 # Load Packages
-pkg <- c("bitops", "caret", "corrplot", "DataExplorer", "dplyr", "factoextra", 
-         "ggbiplot", "gglasso", "ggplot2", "glmnet", "h2o",
-         "knitr", "markdown", "mlbench","RColorBrewer", "RCurl", "rjson", "rmarkdown",
-         "tools", "zoo", "rlang")
+pkg.load <- c("autoEDA","bitops", "caret", "corrplot", "DataExplorer", "dplyr", "factoextra", "ggbiplot", "gglasso", "ggplot2", "glmnet", "h2o", "knitr", "markdown", "minerva", "mlbench","RColorBrewer", "RCurl", "reshape2", "rjson", "rmarkdown", "tools", "zoo", "rlang")
 
-sapply(pkg, require, character.only = TRUE)
+sapply(pkg.load, require, character.only = TRUE)
 
-knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=8, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", cache = TRUE, cache.lazy = TRUE, tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
 
+cacheData = FALSE
+cachePlot = TRUE
+
+knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=8, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
+# cache = TRUE, cache.lazy = TRUE, 
 # opts_knit$set(self.contained=FALSE)
 
 ```
 
-```{r proj_dir}
+```{r proj_dir,cache=cacheData}
 ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
-# DATA.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/data/" 
-DATA.DIR <- paste(ROOT.DIR,"data",sep="/")
+DATA.DIR <- paste(ROOT.DIR,"data",sep="")
 CODE.DIR <- paste(ROOT.DIR, "code", sep="")
 ```
 
-```{r data, echo=TRUE} 
+```{r data, echo=TRUE,cache=cacheData} 
 # Import Data
 # data(Sonar)
 # write.csv(Sonar, file = paste(DATA.DIR, "sonar.csv", sep="") )
@@ -83,31 +85,128 @@ The plot of missing data is not displayed because there is no missing data.
 ### Categorical Frequency
 
 
+The y-variable is well balanced across binary classes, e.g. rock or mine. Examining `Y` counts for the full data set is distributed as:
 
-```{r plt_bar}
+* Mines 111 
+* Rocks 97
+
+```{r plt_bar,cache=cachePlot}
 plot_bar(Sonar)
 ```
 
+
 ### Continuous Distribution
 
-Univariate histograms.
+Univariate histograms. The x-variables are not normally distributed..
 
-```{r plt_cont}
+
+```{r plt_cont,cache=cachePlot, eval=FALSE}
 plot_histogram(Sonar)
 ```
 
-Boxplots by Class label.
+### Box-plots 
 
-```{r plt_boxplot}
+Box-plots by Class label. Check for obviously different distribution of x-variables, by each class of Y.  
+
+```{r plt_boxplot,cache=cachePlot}
 plot_boxplot(Sonar, by="Class")
 
 # plot_scatterplot(Sonar, by="Class")
 ```
 
+## Data Overview
+
+```{r, fig.height=4, fig.width=4}
+dat_summary <- dataOverview(Sonar,outlierMethod = "tukey")
+
+
+# Classification example:
+power <-  predictivePower(x = Sonar,
+                          y = "Class",
+                          outcomeType = "automatic")
+
+overview <- autoEDA(x=Sonar, y="Class")
+```
+
+## Bivariate Freqploy
+
+There is significant overlap from the Rock/Mine signal on many of the predictor variables. It appears to be challenging to find strong predictors from a large portion of the variables. 
+
+```{r plt_bivar_freqpoly}
+ggplot(melt(Sonar[c(1:9,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=30) + 
+  facet_wrap(~variable)
+
+ggplot(melt(Sonar[c(10:18,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+ggplot(melt(Sonar[c(19:27,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+ggplot(melt(Sonar[c(28:36,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(37:45,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(46:54,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+ggplot(melt(Sonar[c(55:61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(bins=35) + 
+  facet_wrap(~variable)
+
+
+
+```
+
+
+### Maximal Information Coefficient
+
+A new statistic called the "Maximal Information Coefficient" (MIC) is able to describe the correlation between paired variables regardless of linear or nonlinear relationship. 
+
+
+```{r mic_dat, eval=FALSE}
+
+# Analysis
+M <- mine(X, y=NULL, alpha=0.7)
+P <- cor(X, y=NULL)
+res <- data.frame(MIC = c(M$MIC))
+rownames(res) <- rownames(M$MIC)
+res$MIC_Rank <- nrow(res) - rank(res$MIC, ties.method="first") + 1
+res$Pearson <- P
+res$Pearson_Rank <- nrow(res) - rank(abs(res$Pearson), ties.method="first") + 1
+res <- res[order(res$MIC_Rank),]
+head(res, n=10)
+```
+
+```{r plt_mic, eval=FALSE}
+# Plot
+# png("MIC_vs_Pearson.png", width=7.5, height=3.5, res=400, units="in", type="cairo")
+op <- par(mfrow=c(1,2), mar=c(4,4,1,1))
+plot(MIC ~ abs(Pearson), res, pch=21,  col=4, bg=5)
+plot(MIC_Rank ~ Pearson_Rank, res, pch=21, col=4, bg=5)
+par(op)
+# dev.off()
+```
 
 ### Correlation 
 
-```{r}
+```{r correlation,cache=cachePlot}
 
 plot_correlation(Sonar )
 
@@ -138,7 +237,7 @@ The machine learning package H2O is leveraged using the R interface.
 
 ## Embed machine learning file into main file. 
 
-```{r deepLearning_main, cache=FALSE, echo=TRUE,results='hide'}
+```{r deepLearning_main, cache=cacheData, echo=TRUE,results='hide'}
 ## Read R Script
 # source("deep_learn_h2o.R")
 # source(file = paste(CODE.DIR, "deep_learn_h2o.R", sep="/") )
@@ -152,7 +251,7 @@ The main file `grp_lasso.Rmd` imports a R script(s) and embeds into the main doc
 
 This child file `deep_learn_h20_roxy.R` uses roxygen formatting on a raw R file.
 
-```{r spin_DeepLearning, echo=TRUE, cache=FALSE}
+```{r spin_DeepLearning, echo=TRUE, cache=cacheData}
 #spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/spinner_test.R')
 {{knitr::spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/deep_learn_h20_roxy.R')}}
 ```
@@ -164,6 +263,7 @@ This child file `deep_learn_h20_roxy.R` uses roxygen formatting on a raw R file.
 
 * [H2O Deep Learning][https://github.com/ahoffer/badger-beats] Liberal use of this GitHub page is utilized for the DeepLearning/H2O/Machine Learning section of this document.
 
+* [Maximal Information Coefficient][http://minepy.readthedocs.io/en/latest/details.html] http://www.exploredata.net/
 
 ## End Time 
 
