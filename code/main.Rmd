@@ -4,6 +4,7 @@ author: "MEMadsen"
 date: "May 2, 2018"
 output: 
   html_document: 
+    code_folding: hide
     fig_caption: yes
     keep_md: yes
     number_sections: yes
@@ -48,6 +49,19 @@ DATA.DIR <- paste(ROOT.DIR,"data",sep="")
 CODE.DIR <- paste(ROOT.DIR, "code", sep="")
 ```
 
+# Sonar Description
+
+This data set was used by Gorman and Sejnowski in their study of the classification of sonar signals using a neural network [Gorman and Sejnowski].  The task is to discriminate between sonar signals bounced off a metal cylinder and those bounced off a roughly cylindrical rock positioned on the ocean floor.
+
+
+Each pattern is a set of 60 numbers in the range 0.0 to 1.0. Each number represents the energy within a particular frequency band, integrated over a certain period of time.  The integration aperture for higher frequencies occur later in time, since these frequencies are transmitted later during the chirp.
+
+
+The label associated with each record contains the letter "R" if the object is a rock and "M" if it is a mine (metal cylinder). The numbers in the labels are in increasing order of aspect angle, but they do not encode the angle directly.
+
+**Format**   
+The data frame has 208 observations on 61 variables, all numerical and one nominal, e.g. Class.
+
 ```{r data, echo=TRUE,cache=cacheData} 
 # Import Data
 # data(Sonar)
@@ -65,7 +79,7 @@ y = Sonar$Class
 X = Sonar[,-61]
 ```
 
-# Exploratory Data Analysis
+# Exploratory Data Analysis {.tabset .tabset-fade}
 
 ## Initial Visualization
 
@@ -85,7 +99,7 @@ The plot of missing data is not displayed because there is no missing data.
 ### Categorical Frequency
 
 
-The y-variable is well balanced across binary classes, e.g. rock or mine. Examining `Y` counts for the full data set is distributed as:
+The y-variable is well balanced across binary classes, e.g. rock or mine. Examining **Y** counts for the full data set is distributed as:
 
 * Mines 111 
 * Rocks 97
@@ -128,46 +142,57 @@ power <-  predictivePower(x = Sonar,
 overview <- autoEDA(x=Sonar, y="Class")
 ```
 
-## Bivariate Freqploy
+## Bivariate Frequency Polygon
 
 There is significant overlap from the Rock/Mine signal on many of the predictor variables. It appears to be challenging to find strong predictors from a large portion of the variables. 
 
 ```{r plt_bivar_freqpoly}
 ggplot(melt(Sonar[c(1:9,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=30) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.65, .1)) +
   facet_wrap(~variable)
 
 ggplot(melt(Sonar[c(10:18,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
   facet_wrap(~variable)
+
 
 ggplot(melt(Sonar[c(19:27,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
   facet_wrap(~variable)
+
 
 ggplot(melt(Sonar[c(28:36,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
   facet_wrap(~variable)
 
 
-ggplot(melt(Sonar[c(37:45,61)], id.vars = "Class"), 
+
+ggplot(melt(Sonar[c(37:48,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
   facet_wrap(~variable)
 
 
-ggplot(melt(Sonar[c(46:54,61)], id.vars = "Class"), 
+ggplot(melt(Sonar[c(49:54,61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.2, .05)) +
   facet_wrap(~variable)
+
 
 ggplot(melt(Sonar[c(55:61)], id.vars = "Class"), 
        aes(x=value,colour=Class)) +  
-  geom_freqpoly(bins=35) + 
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.05, .01)) +
   facet_wrap(~variable)
 
 
@@ -175,26 +200,32 @@ ggplot(melt(Sonar[c(55:61)], id.vars = "Class"),
 ```
 
 
-### Maximal Information Coefficient
+## Maximal Information Coefficient
 
-A new statistic called the "Maximal Information Coefficient" (MIC) is able to describe the correlation between paired variables regardless of linear or nonlinear relationship. 
+The "Maximal Information Coefficient" (MIC) is able to describe the correlation between paired variables regardless of linear or nonlinear relationship. 
 
 
-```{r mic_dat, eval=FALSE}
+```{r mic_dat}
+micValues <- mine(x=Sonar[,-61],
+                  y = ifelse(Sonar$Class == "M", 1, 0), 
+                  alpha=0.7)
 
 # Analysis
-M <- mine(X, y=NULL, alpha=0.7)
-P <- cor(X, y=NULL)
-res <- data.frame(MIC = c(M$MIC))
-rownames(res) <- rownames(M$MIC)
+M <- micValues$MIC
+P <- cor(x=Sonar[,-61], y = ifelse(Sonar$Class == "M", 1, 0))
+
+res <- data.frame(MIC = c(micValues$MIC))
+# res <- data.frame(M)
+rownames(res) <- rownames(micValues$MIC)
 res$MIC_Rank <- nrow(res) - rank(res$MIC, ties.method="first") + 1
 res$Pearson <- P
 res$Pearson_Rank <- nrow(res) - rank(abs(res$Pearson), ties.method="first") + 1
 res <- res[order(res$MIC_Rank),]
 head(res, n=10)
+tail(res, n=10)
 ```
 
-```{r plt_mic, eval=FALSE}
+```{r plt_MIC}
 # Plot
 # png("MIC_vs_Pearson.png", width=7.5, height=3.5, res=400, units="in", type="cairo")
 op <- par(mfrow=c(1,2), mar=c(4,4,1,1))
@@ -231,13 +262,13 @@ rect.hclust(hc1, k = 5, border = 2:5)
 ```
 
 
-# Machine Learning
+# Machine Learning  {.tabset .tabset-fade}
 
 The machine learning package H2O is leveraged using the R interface. 
 
-## Embed machine learning file into main file. 
 
-```{r deepLearning_main, cache=cacheData, echo=TRUE,results='hide'}
+
+```{r deepLearning_main, cache=cacheData, results='hide'}
 ## Read R Script
 # source("deep_learn_h2o.R")
 # source(file = paste(CODE.DIR, "deep_learn_h2o.R", sep="/") )
@@ -245,7 +276,7 @@ The machine learning package H2O is leveraged using the R interface.
 
 
 
-## Child doc: Spin
+**Child doc: Spin**  
 
 The main file `grp_lasso.Rmd` imports a R script(s) and embeds into the main doc. The outputs can be messy or buggy but there are many benefits to logically distributing long files.
 
@@ -261,9 +292,22 @@ This child file `deep_learn_h20_roxy.R` uses roxygen formatting on a raw R file.
 # References 
 
 
+* Gorman,  R.  P.,  and  Sejnowski,  T.  J.  (1988).   "Analysis  of  Hidden  Units  in  a  Layered  Network Trained to Classify Sonar Targets" in Neural Networks, Vol. 1, pp. 75-89.
+
+
 * [H2O Deep Learning][https://github.com/ahoffer/badger-beats] Liberal use of this GitHub page is utilized for the DeepLearning/H2O/Machine Learning section of this document.
 
 * [Maximal Information Coefficient][http://minepy.readthedocs.io/en/latest/details.html] http://www.exploredata.net/
+
+**Brief Review ROC plots.** 
+
+Explain ROC in terms of classifying rocks vs mines. The more tolerant you are of "slop" (false positives), the more you can be sure you aren't missing any true positives. The more willing you are to accept the computer misclassifying, the less likely you are to miss-classify a mine.
+
+PS: ROC curve technical background requires some understanding. I've been meaning to read these articles about it:
+
+* http://blogs.sas.com/content/iml/2011/07/29/computing-an-roc-curve-from-basic-principles.html
+
+* http://www.dataschool.io/roc-curves-and-auc-explained/
 
 ## End Time 
 
