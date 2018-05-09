@@ -1,0 +1,614 @@
+---
+title: "Group LASSO"
+author: "Michael Madsen & Trent Lemkus"
+date: "2018 May 7"
+output: 
+  html_document: 
+    code_folding: hide
+    fig_caption: yes
+    keep_md: yes
+    number_sections: yes
+    theme: readable
+    toc: yes
+---
+
+
+
+```{r setup, include=FALSE}
+stTime <- Sys.time()
+
+# Load Packages
+pkg <- c("ggplot2", "knitr", "markdown", "glmnet", "caret", "gglasso", "corrplot","RColorBrewer","zoo", "factoextra", "mlbench", "rlang")
+
+sapply(pkg, require, character.only = TRUE)
+
+# Knitr Options
+knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=6, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", cache = TRUE,  cache.lazy = TRUE,  tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
+
+
+# Setup logical directory structure
+ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
+DATA.DIR <- paste(ROOT.DIR,"data",sep="")
+CHART.DIR <- paste(ROOT.DIR, "charts", sep="")
+CODE.DIR <- paste(ROOT.DIR, "code", sep="")
+```
+
+
+
+------------------------------------------------------      
+# Abstract
+        
+In 2006, Yuan and Lin introduced the group lasso in order to allow predefined groups of covariates to be selected into or out of a model together, so that all the members of a particular group are either included or not included. While there are many settings in which this is useful, perhaps the most obvious is when levels of a categorical variable are coded as a collection of binary covariates. In this case, it often doesn't make sense to include only a few levels of the covariate; the group lasso can ensure that all the variables encoding the categorical covariate are either included or excluded from the model together.                          
+                   
+The idea behind this report is to not only delve into the mathematical details of the Grouped LASSO, but also simplify the details so that the average reader can walk away with an approximate understanding of this particular derivation of the LASSO. The traditional LASSO is amenable to data sets where sparsity is more likely to uncover the "true" model, but a downfall of this method is its inability to perform well when the design matrix contains much multicollinearity. In such an event we often find the L1 regularization to not only produce a sub-standard model, but it will also fail at obtaining maximal sparsity or any as is seen in the case of the Sonar data set we introduce in a later section. Furthermore, we make use of the Sonar data set to illustrate how the application of the Grouped LASSO can ameliorate the formerly mentioned sparsity issue in the light of multicollinearity.        
+            
+The mathematics and formulae behind the Grouped LASSO are discussed, but due to it's complex nature and even more complex solution path we have added a small example to illustrate the inner workings of this derivation. We also discuss how to group your predictors based on correlation as well as the interesting result that sparsity is not only obtained, but the algorithm has an ability to do so by predictor within a group and not by eliminating entire groups. We do, however, avoid discussions about the variants of the Group LASSO: Sparse Group LASSO, Overlap Group LASSO, Sparse GAM with Group LASSO etc.  
+
+# The Grouped LASSO
+
+There are many regression problems in which the covariates have a natural group structure, and it is desirable to have all coefficients within a group become nonzero (or zero) simultaneously. The various forms of group lasso penalty are designed for such situations. We first define the group lasso and then develop this and other motivating examples.                           
+The setup is as follows:          
+         
+*There are $J$ groups where $j = 1,...,J$
+*The vector $Z_j \in \mathbb{R}^{P_j}$ represents the covariates in group j       
+      
+The Goal:        
+     
+To predict a real-values response $Y \in \mathbb{R}$ based on the collection of covariates in our $J$ groups $(Z_1,...,Z_j)$ 
+
+##Defining the Linear Model
+          
+The linear model can be defined as:     
+      
+$$\mathbb{E}(Y|Z) = \theta_0 + \sum_{j=1}^JZ_j^T\theta_j,  \ where \  \theta_j \in \mathbb{R}^{P_j} $$        
+            
+Note: $\theta_j$ represents a group of $p_j$ regression coefficients.     
+        
+##Defining The Convex Problem         
+         
+Given a collection of $N$ samples $\{(y_i,z_{i1},z_{i2},...,z_{i,J})\}^N_{i=1}$ the Group LASSO solves the following covex problem:        
+        
+$$\underset{\theta_0 \in \mathbb{R}, \theta_j \in \mathbb{R^{p_j}} }{\operatorname{minimize}} \left\{\frac{1}{2}\sum_{i=1}^N(y_i - \theta_0 - \sum_{j=1}^Jz_{ij}^T\theta_j)^2 + \lambda\sum_{j=1}^J\|\theta_j\|_2\right\}$$ 
+Where $\|\theta_j\|_2$ is the Euclidean norm of the vector $\theta_j$ and the following hold true:          
+
+* depending on $\lambda \ge 0$, either the entire vector $\hat{\theta_j}$ will be zero, or all its elements will be nonzero.                
+* when $p_j = 1$, then we have $\|\theta_j\|_2 = |\theta_j|$, so if all the groups are singletons i.e. every group represents a single predictor, than the optimization problem reduces to the ordinary LASSO.       
+* All groups are equally penalized, a choice which leads larger groups to be more likely to be selected. In their original proposal, Yuan and Lin (2006)[1] recommended weighting the penalties for each group according to their size, by a factor $\sqrt{p_j}$. One could also argue for a factor of $\|\mathbb{Z}_j\|_F$ where the matrices are not orthonormal.                 
+       
+Here we compare the constraint region for the Group LASSO (left) to that of the LASSO in $\mathbb{R}^3$. We see that the Group LASSO shares attributes of both the $l_2$ and $l_1$ balls:                
+             
+```
+![My Folder](Group LASSO.JPG) 
+```                 
+             
+# Multi-Level Sparsity: Sparse Group LASSO        
+         
+I would be remiss if I didn't, at the very least, discuss the Sparse Group LASSO, which takes the Group LASSO a step further by not only imposing sparsity on the groups, but also selects which coefficients are non-zero within the groups. From a technical standpoint this is vital considering the core uncertainty in this style of problem if that of determining the groups. If you have selected your groups to include, even just one, important variable(s) then this coefficient would be shrunk to zero along with all other coefficients in said group, however with the advantages of using the Sparse Group LASSO there is a strong chance that "important" coefficients within zeroed groups may be recovered in the final model.      
+        
+In order to achieve within group sparsity, we augment the basic Group LASSO with an additional $l_1$-penalty, leading to the convex program:        
+        
+$$\underset{\{\theta_j \in \mathbb{R}^{p_j}\}}{\operatorname{minimize}} \left\{\frac{1}{2}\|\mathbf{y} - \sum_{j=1}^J\mathbf(Z)_j\theta_j\|_2^2 + \lambda \sum_{j=1}^J[(1-\alpha)\|\theta_j\|_2 + \alpha\|\theta_j\|_1] \right\}$$
+                 
+with $\alpha \in [0,1]$. Much like the Elastic Net, the parameter $\alpha$ creates a bridge between the Group LASSO ($\alpha = 0$) and the LASSO ($\alpha = 1$). Below is the image that contrasts the Group LASSO constraint region with that of the Sparse Group LASSO for the case in $\mathbb{R}^3$:    
+    
+```
+![My Folder](Sparse Group LASSO.JPG)        
+```
+
+*Note: in the two horizontal planes the constraint region resembles that of the elastic net being more rounded than angular.*      
+                 
+# The Sonar Data Set                  
+              
+## Description      
+         
+This is the data set used by Gorman and Sejnowski in their study of the classification of sonar signals using a neural network [2]. The task is to train a network to discriminate between sonar signals bounced off a metal cylinder and those bounced off a roughly cylindrical rock.        
+         
+Each pattern is a set of 60 numbers in the range 0.0 to 1.0 [3]. Each number represents the energy within a particular frequency band, integrated over a certain period of time. The integration aperture for higher frequencies occur later in time, since these frequencies are transmitted later during the chirp.         
+            
+The label associated with each record contains the letter "R" if the object is a rock and "M" if it is a mine (metal cylinder). The numbers in the labels are in increasing order of aspect angle, but they do not encode the angle directly.          
+          
+Below is a preview of the data set:                         
+                
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+# Import Data
+data(Sonar)
+
+# Investigate Sonar Data Set
+# str(Sonar)
+
+seed = 777
+set.seed(seed)
+```
+       
+## Why Use A Group LASSO?         
+       
+The primary issue with the Sonar data is the eggregious multicollinearity present. We display this with a correlation heat map below:              
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+# reomve rows with missing values
+Sonar = Sonar[complete.cases(Sonar),]
+Sonar = Sonar[sample(nrow(Sonar)),]
+
+# Assign Predictors and Response
+y = Sonar$Class
+X = Sonar[,-61]
+
+# Correlation Plot
+# create correlation matrix
+cor_mat=cor(X, use="complete.obs")
+# plot cor matrix
+corrplot(cor_mat, 
+         order = "original", 
+         method="square") 
+```
+             
+As we can see from the above correlation heat map, we have thick clusters of predictors that are highly correlated with one another. This is an issue when trying to predict the response with the LASSO. Our results would typically contain high variability and almost no sparsity is obtained, but this is almost single handedly ameliorated with the Group LASSO.       
+          
+## How to Determine Groups?            
+            
+There are various clustering algorithms that can be utilized when forming groups: The method that seemed to work the best is Hierarchical Clustering with a Euclidean distance and a Complete linkage that I determined through trial and error, however I did investigate a contemporary clustering algorithm called DBSCAN (Density Based Clustering of Applications with Noise). Because this report is focused on the Group LASSO I will ommit the more techinical details, but I will state that it did not perform well because the groups are too sparse in the PC1/PC2 dimension.        
+          
+Below we apply the "elbow rule" to the Scree Plot and highlight the 5 selected groups on the Dendrogram:                       
+
+```{r warning = FALSE, message = FALSE, cache = TRUE}          
+# Apply Hierarchical Clustering
+
+# Dissimilarity matrix
+d = dist(t(X), method = "euclidean")
+
+# Hierarchical clustering using Complete Linkage
+hc1 = hclust(d, method = "complete" )
+
+# Apply Elbow rule
+fviz_nbclust(X, FUN = hcut, method = "wss") # It seems 4 - 6 groups may be appropriate
+
+# Plot dendrogram with 5 selected groups
+plot(hc1, cex = 0.6, hang = -1)
+rect.hclust(hc1, k = 5, border = 2:5) 
+
+# We can see that 5 groups is a reasonable choice
+
+# Create groups for Group LASSO
+# Cut tree into 5 groups
+sub_grp = cutree(hc1, k = 5)
+grp=c(as.matrix(sub_grp))
+# Define Groups
+grp1 = X[,names(which(sub_grp == 1))]
+grp2 = X[,names(which(sub_grp == 2))]
+grp3 = X[,names(which(sub_grp == 3))]
+grp4 = X[,names(which(sub_grp == 4))]
+grp5 = X[,names(which(sub_grp == 5))]
+```              
+
+### Train Test Split         
+        
+We split the data set into a 90/10 train-test split. The main reason for this type of split is purely because the number of samples is disproportionate to the number of observations. The training set is left containing 3 samples for every predictor. This is far below the recomended rule of thumb of 10 (for Regression problems), albeit an area where the LASSO algorithm shines.       
+           
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+# Create a 90/10 Train Test Split
+# set.seed(777)
+
+
+trainIndex <- createDataPartition(y, p = .9, 
+                                  list = FALSE, 
+                                  times = 1)
+# Seperate Train and Test Sets
+y_train = y[trainIndex]
+y_test = y[-trainIndex]
+X_train = X[trainIndex,]
+X_test = X[-trainIndex,]
+```           
+
+## Model's Implimented                    
+              
+We fit and compare the following models:            
+
+**1) Multi-Layer Perceptron (MLP)**       
+       
+The first model I chose simply because the developers of the Sonar data set (Gorman & Sejnowski 1988)[2] fit a MLP model to this data with perfect prediction accuracy. I have very little doubt that the training took an immense amount of time with many iterations to the number of layers and included neurons. I made use of the SNNS (Stuttgart Neural Network Simulator) package in R. We tuned this model using a tuning grid for three layers with three settings of 10, 20, and 30 hidden neurons. Due to time constraints a larger tuning grid was unable to be explored.          
+       
+**2) LASSO**            
+        
+This model was fit using 10 fold 5 repeated cross validation strategy within the framework of the "Caret" package. I did make use of a tuning grid for $\lambda$.        
+         
+**3) Elastic Net**                      
+          
+This model was fit using 10 fold 5 repeated cross validation strategy within the framework of the "Caret" package. I did make use of a tuning grid for $\alpha$ and $\lambda$.
+              
+**4) Group LASSO**             
+         
+This model was fit using a cross validation function within the "gglasso" package with 5 folds as an option to balance the CV settings of the LASSO/Elastic Net combination with the Group LASSO/Group Ridge combination for comparability.        
+          
+**5) Group Ridge**            
+         
+This model was fit using a cross validation function within the "gglasso" package with 5 folds as an option to balance the CV settings of the LASSO/Elastic Net combination with the Group LASSO/Group Ridge combination for comparability.                  
+          
+*The comparison will be made based on test sample prediction accuracy, time elapsed, and model sparsity.*              
+            
+## Model Comparison           
+         
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+#######################################
+## Multi-Layer Perceptron
+#######################################
+# Define Grid
+layer1 = seq(10,30,10)
+layer2 = seq(10,30,10)
+layer3 = seq(10,30,10)
+mlp_grid = expand.grid(.layer1 = layer1, 
+                       .layer2 = layer2, 
+                       .layer3 = layer3)
+
+# Train Model
+run.MLP = 0
+if(run.MLP == 1){
+  set.seed(1)
+  start.time.mlp <- Sys.time()
+  fit.mlp = caret::train(x = data.matrix(X_train),
+                         y = y_train, 
+                         method = "mlpML", 
+                         #trControl = trnCtrl,
+                         #act.fct = 'logistic',
+                         tuneGrid = mlp_grid,
+                         standardize = FALSE)
+  
+  end.time.mlp <- Sys.time()
+  time.taken.mlp <- end.time.mlp - start.time.mlp 
+  
+  
+  saveRDS(time.taken.mlp,
+          file = paste(DATA.DIR, "time.taken.mlp.rds", sep="/"))
+  save(fit.mlp,
+       file = paste(DATA.DIR, "fit.mlp.Rdata", sep="/"))
+  saveRDS(fit.mlp,
+          file = paste(DATA.DIR, "fit.mlp.rds", sep="/") )
+}
+
+
+time.taken.mlp <- readRDS(file = paste(DATA.DIR, "time.taken.mlp.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.mlp.Rdata", sep="/"))
+
+
+# Plot and Model Details
+#plot(my.train)
+best.params = fit.mlp$bestTune
+my.mlp.model <- fit.mlp$finalModel
+# Prediction on Test Set
+pred.mlp = predict(fit.mlp, newdata = data.matrix(X_test))
+mlp_matrix <- caret::confusionMatrix(pred.mlp, y_test)
+```
+
+```{r lasso_fit, warning = FALSE, message = FALSE, cache = TRUE}
+#######################################
+## LASSO
+#######################################
+# Define Grid
+lambda.grid <- seq(0, 50)
+alpha.grid <- seq(0, 1, length = 20)
+
+srchGrd = expand.grid(.alpha = 1, .lambda = lambda.grid)
+
+# Setup CV Function
+trnCtrl = trainControl(
+  method = "repeatedCV",
+  number = 10,
+  repeats = 5)
+
+# Train Model
+run.LASSO = 0
+if(run.LASSO == 1){
+  set.seed(seed)
+  start.time.L <- Sys.time()
+  
+  fit.LASSO <- caret::train(x = data.matrix(X_train),
+                            y = y_train,
+                            method = "glmnet",
+                            tuneGrid = srchGrd,
+                            trControl = trnCtrl,
+                            standardize = FALSE)
+  
+  
+  end.time.L <- Sys.time()
+  time.taken.L <- end.time.L - start.time.L
+
+
+  saveRDS(time.taken.L,
+          file = paste(DATA.DIR, "time.taken.L.rds", sep="/"))
+  save(fit.LASSO,
+       file = paste(DATA.DIR, "fit.LASSO.Rdata", sep="/"))
+  saveRDS(fit.LASSO,
+          file = paste(DATA.DIR, "fit.LASSO.rds", sep="/") )
+}
+
+time.taken.L <- readRDS(file = paste(DATA.DIR, "time.taken.L.rds", sep="/"))
+# fit.LASSO <- readRDS(file = paste(DATA.DIR, "fit.LASSO.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.LASSO.Rdata", sep="/"))
+
+
+# Plot and Model Details
+best.params = fit.LASSO$bestTune
+my.LASSO.model <- fit.LASSO$finalModel
+# Prediction on Test Set
+pred.LASSO = predict(fit.LASSO, newdata = data.matrix(X_test))
+LASSO_matrix <- caret::confusionMatrix(pred.LASSO, y_test)
+#######################################
+## Elastic Net (tuned alpha)
+#######################################
+# Define Grid
+lambda.grid <- seq(0, 50)
+alpha.grid <- seq(0, 1, length = 20)
+
+srchGrd = expand.grid(.alpha = alpha.grid, .lambda = lambda.grid)
+
+# Setup CV Function
+trnCtrl = trainControl(
+  method = "repeatedCV",
+  number = 10,
+  repeats = 5)
+
+# Train Model
+run.fit.glmN = 0
+if(run.fit.glmN == 1){
+  # set.seed(3)
+  set.seed(seed)
+  start.time.EN <- Sys.time()
+  fit.glmN <- caret::train(x = data.matrix(X_train),
+                           y = y_train,
+                           method = "glmnet",
+                           tuneGrid = srchGrd,
+                           trControl = trnCtrl,
+                           standardize = FALSE)
+  
+  end.time.EN <- Sys.time()
+  time.taken.EN <- end.time.EN - start.time.EN
+
+  saveRDS(time.taken.EN,
+          file = paste(DATA.DIR, "time.taken.EN.rds", sep="/"))
+  save(fit.glmN,
+       file = paste(DATA.DIR, "fit.glmN.Rdata", sep="/"))
+  saveRDS(fit.glmN,
+          file = paste(DATA.DIR, "fit.glmN.rds", sep="/") )
+  }
+
+
+
+time.taken.EN <- readRDS(file = paste(DATA.DIR, "time.taken.EN.rds", sep="/"))
+# fit.glmN <- readRDS(file = paste(DATA.DIR, "fit.glmN.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.glmN.Rdata", sep="/"))
+
+
+# Plot and Model Details
+#plot(fit.glmN)
+best.params = fit.glmN$bestTune
+my.glmnet.model <- fit.glmN$finalModel
+# Prediction on Test Set
+pred.glmnet = predict(fit.glmN, newdata = data.matrix(X_test))
+glmN_matrix = caret::confusionMatrix(pred.glmnet, y_test)
+
+#######################################
+## Group LASSO
+#######################################
+# Cross Validation (This can take a substantial amount of time - around 45 mins)
+X_train = as.matrix(X_train)
+y_train = ifelse(y_train == "M", 1 , -1) # Binary Factor needs to be numeric {-1,1} format
+
+run.GLASSO = 0 
+if(run.GLASSO == 1){
+  # set.seed(4)
+  set.seed(seed)
+  start.time.GLASSO <- Sys.time()
+  fit.GLASSO=cv.gglasso(x=X_train,
+                        y=y_train,
+                        group=grp, 
+                        loss="logit",
+                        pred.loss="L1", # Penalized Logistic Regression
+                        nfolds=10) 
+  
+  end.time.GLASSO <- Sys.time()
+  time.taken.GLASSO <- end.time.GLASSO - start.time.GLASSO
+  
+  saveRDS(time.taken.GLASSO,
+          file = paste(DATA.DIR, "time.taken.GLASSO.rds", sep="/"))
+  save(fit.GLASSO,
+       file = paste(DATA.DIR, "fit.GLASSO.Rdata", sep="/"))
+  saveRDS(fit.GLASSO,
+          file = paste(DATA.DIR, "fit.GLASSO.rds", sep="/") )
+  }
+
+time.taken.GLASSO <- readRDS(file = paste(DATA.DIR, 
+                                          "time.taken.GLASSO.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.GLASSO.Rdata", sep="/"))
+
+
+
+# Prediction
+pred.gglasso = predict(fit.GLASSO, newx = data.matrix(X_test), 
+                       s = "lambda.min", type = "class")
+pred.gglasso = ifelse(pred.gglasso == 1, "M", "R")
+pred.gglasso = as.factor(pred.gglasso)
+GLASSO_matrix = caret::confusionMatrix(pred.gglasso, y_test)
+
+#######################################
+# Group Ridge
+#######################################
+# Cross Validation (This can take several minutes)
+
+run.RLASSO = 0
+if(run.RLASSO == 1){
+  # set.seed(5)
+  set.seed(seed)
+  start.time.RLASSO <- Sys.time()
+  fit.cv.ridge = cv.gglasso(x=X_train, 
+                            y=y_train, 
+                            group=grp, 
+                            loss="logit",
+                            pred.loss="L2", # Penalized Logistic Regression
+                            nfolds=10)
+  
+  end.time.RLASSO <- Sys.time()
+  time.taken.RLASSO <- end.time.RLASSO - start.time.RLASSO
+  
+  
+  saveRDS(time.taken.RLASSO, 
+          file = paste(DATA.DIR, "time.taken.RLASSO.rds", sep="/"))
+  save(fit.cv.ridge, 
+       file = paste(DATA.DIR, "fit.cv.ridge.Rdata", sep="/"))
+  saveRDS(fit.cv.ridge, 
+          file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/") )
+}
+
+
+time.taken.RLASSO <- readRDS(file = paste(DATA.DIR, "time.taken.RLASSO.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.cv.ridge.Rdata", sep="/"))
+
+# Best Lambda
+lmbda=fit.cv.ridge$lambda.min
+
+# Prediction
+pred.gglasso.L2 = predict(fit.cv.ridge, newx = data.matrix(X_test), 
+                       s = "lambda.min", type = "class")
+pred.gglasso.L2 = ifelse(pred.gglasso.L2 == 1, "M", "R")
+pred.gglasso.L2 = as.factor(pred.gglasso.L2)
+RGroup_matrix = caret::confusionMatrix(pred.gglasso.L2, y_test)
+```
+              
+### Time Comparison (GROUPED LASSO doc)  
+             
+Compare model results:              
+
+            
+         
+Model           |Accuracy                      | Run Time            |No. of Predictors|
+----------------|------------------------------|---------------------|-----------------|
+MLP             |`r mlp_matrix$overall[[1]]`   |`r round(time.taken.mlp,2)`   |`r length(my.mlp.model$xNames)`|
+LASSO           |`r LASSO_matrix$overall[[1]]` |`r round(time.taken.L,2)`     |`r sum(coef(my.LASSO.model, s = fit.LASSO$bestTune$lambda)[-1]!=0)`|
+Elastic Net     |`r glmN_matrix$overall[[1]]`  |`r round(time.taken.EN,2)`    |`r sum(coef(my.glmnet.model, s = fit.glmN$bestTune$lambda)[-1]!=0)`|
+Group LASSO     |`r GLASSO_matrix$overall[[1]]`|`r round(time.taken.GLASSO,2)`|`r sum(coef(fit.GLASSO)[-1]!=0)`   |
+Group Ridge     |`r RGroup_matrix$overall[[1]]`|`r round(time.taken.RLASSO,2)`|60   |        
+      
+           
+**Analysis**             
+          
+The outright winner if run time is the exclusive concern would typically be the Elastic Net and the worst run time is the Group LASSO.
+      
+### Sparsity Comparison    
+          
+*We omit the MLP and the Group Ridge from this discussion since they are not sparse models to begin with*   
+           
+**LASSO**           
+            
+```{r plot_lasso, warning = FALSE, message = FALSE, cache = TRUE}
+# LASSO CV Plot
+# plot(fit.LASSO)
+
+
+svg(file = paste(CHART.DIR, "fit.LASSO.svg", sep="/"), width = 8, height =6, pointsize=12)
+plot(fit.LASSO)
+# mtext(adj=0, side=3 , 
+      # text=expression(bold(paste("LASSO Cross Validation - ", (beta)," * SPY"))))
+dev.off()
+```
+          
+The accuracy of the LASSO model is highest when there is no coefficient shrinkage. This is to be expected from the multicollinearity issue we had previously assessed and described above.         
+          
+**Group LASSO**           
+            
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+# Best Lambda Value - Group LASSO
+GLASSO.lmbda=log(fit.GLASSO$lambda.min)
+# Group LASSO Model Plots
+plot(fit.GLASSO$gglasso.fit,
+     xlim = c(-6,-3.75),
+     ylim = c(-2,2.5))
+abline(v = GLASSO.lmbda)
+text(-5.8,2.2, bquote(lambda == .(round(GLASSO.lmbda,3))))
+plot(coef(fit.GLASSO)[-1],
+     ylab = "Coefficient Value",
+     xlab = "Variable",
+     main = "Coefficient: Group LASSO")
+text(44,1.2, "Partial Group 1 Shrinkage", col = "Red")
+abline(v=c(51,60), h=0, col = c("Black","Red","Red"))
+```          
+           
+Here we see that not only was there shrinkage but there were 10 coefficients shrunk to zero, however these were all coefficients that belonged to Group 1, but did not encompass the full membership of Group 1 leading me to believe that the package Glasso impliments the Sparse Group LASSO and not the Group LASSO singularly.                        
+                
+**Elastic NET**           
+            
+```{r warning = FALSE, message = FALSE, cache = TRUE}
+# Elastic Net Plot
+plot(fit.glmN)
+```          
+          
+Once again we see a similar plot to that of the LASSO where all the repeated CV attempts achieved highest accuracy with no parameter shrinkage.                  
+          
+### Prediction Accuracy          
+         
+**MLP**         
+     
+```{r MLP.matrix, warning = FALSE, message = FALSE, cache = TRUE}
+# Confusion Matrices
+mlp_matrix
+```
+
+
+**LASSO**         
+     
+```{r LASSO.matrix, warning = FALSE, message = FALSE, cache = TRUE}
+LASSO_matrix
+```
+
+
+**Eslastic Net**         
+     
+```{r glmN.matrix, warning = FALSE, message = FALSE, cache = TRUE}
+glmN_matrix
+```
+
+
+**Group LASSO**         
+     
+```{r GLASSO.matrix, warning = FALSE, message = FALSE, cache = TRUE}
+GLASSO_matrix
+```
+
+
+**Ridge Group**         
+     
+```{r RGroup.matrix, warning = FALSE, message = FALSE, cache = TRUE}
+RGroup_matrix
+```
+           
+# Conclusion         
+       
+The Group LASSO not only achieves sparsity, but it does so with the highest accuracy, however one should be cautious of the time taken to run since this algorithm becomes increasingly slow with the increase in predictors and is further slowed down when running combining methods like Cross Validation.
+           
+# References     
+         
+[1] Yuan, M. and Lin, Y. (2006) "Model Selection and Estimation in Regression with Grouped Variables". *J. R. Statist. Soc.* B, 68, 49-67            
+[2] Hastie. H, Tibshirani. R, and Wainwright, M. (2016) "Statistical Learning With Sparsity: The Lasso and Generalizations". *CRC Press*          
+[3] Gorman, R. P., and Sejnowski, T. J. (1988). "Analysis of Hidden Units in a Layered Network Trained to Classify Sonar Targets" in Neural Networks, Vol. 1, pp. 75-89.               
+[4] Newman, D.J. & Hettich, S. & Blake, C.L. & Merz, C.J. (1998). UCI Repository of machine learning databases [http://www.ics.uci.edu/~mlearn/MLRepository.html]. Irvine, CA: University of California, Department of Information and Computer Science.             
+           
+
+## Document Settings  
+
+* Document date of last update
+
+
+```{r doc_run_time, echo=TRUE}
+stTime 
+
+endTime <- Sys.time()
+endTime
+
+endTime   - stTime
+```
+## R Code for Report
+
+
+```{r R_code, ref.label=all_labels(),eval=FALSE,echo=TRUE}
+
+
+```

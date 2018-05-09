@@ -1,0 +1,345 @@
+# Chapter 1: H20
+
+```{r stTime_main}
+# Document Updated last:
+st.time.0.main <- Sys.time()
+```
+
+
+
+```{r setup.main, message=FALSE, results='hide'}
+
+## Optional -- Install Packages
+#library(devtools)
+#install_github("vqv/ggbiplot")
+
+# Load Packages
+pkg.load <- c("autoEDA","bitops", "caret", "corrplot", "DataExplorer", "dplyr", "factoextra", "ggbiplot", "gglasso", "ggplot2", "glmnet", "h2o", "knitr", "markdown", "minerva", "mlbench","RColorBrewer", "RCurl", "reshape2", "rjson", "rmarkdown", "tools", "zoo", "rlang")
+
+
+
+sapply(pkg.load, require, character.only = TRUE)
+
+
+cacheData = FALSE
+cachePlot = TRUE
+fig_width_11 = 11
+fig_height_8 = 8
+# fig.width=fig_width_11, fig.height=fig_height_8
+fig_width_7 = 7 
+fig_height_5 = 5 
+# fig.width=fig_width_7, fig.height=fig_height_5
+
+knitr::opts_chunk$set(progress = TRUE, fig.width=fig_width_11, fig.height=fig_height_8, message = FALSE, warning = FALSE, fig.align = "center", tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
+# cache = TRUE, cache.lazy = TRUE, 
+# opts_knit$set(self.contained=FALSE)
+
+```
+
+```{r proj_dir,cache=cacheData}
+ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
+DATA.DIR <- paste(ROOT.DIR,"data", sep="")
+CHART.DIR <- paste(ROOT.DIR, "charts", sep="")
+CODE.DIR <- paste(ROOT.DIR, "code", sep="")
+```
+
+# Sonar Description
+
+This data set was used by Gorman and Sejnowski in their study of the classification of sonar signals using a neural network [Gorman and Sejnowski].  The task is to discriminate between sonar signals bounced off a metal cylinder and those bounced off a roughly cylindrical rock positioned on the ocean floor.
+
+
+Each pattern is a set of 60 numbers in the range 0.0 to 1.0. Each number represents the energy within a particular frequency band, integrated over a certain period of time.  The integration aperture for higher frequencies occur later in time, since these frequencies are transmitted later during the chirp.
+
+
+The label associated with each record contains the letter "R" if the object is a rock and "M" if it is a mine (metal cylinder). The numbers in the labels are in increasing order of aspect angle, but they do not encode the angle directly.
+
+**Format**   
+The data frame has 208 observations on 61 variables, all numerical and one nominal, e.g. Class.
+
+```{r data, echo=TRUE,cache=cacheData} 
+# Import Data
+# data(Sonar)
+# write.csv(Sonar, file = paste(DATA.DIR, "sonar.csv", sep="") )
+#
+Sonar <- read.csv(file = paste(DATA.DIR, "sonar.csv", sep="/") )
+Sonar <- select(Sonar , -X)
+
+# reomve rows with missing values
+# Sonar_completeCase = Sonar[complete.cases(Sonar),]
+# Sonar = Sonar[sample(nrow(Sonar)),]
+
+# Assign Predictors and Response
+y = Sonar$Class
+X = Sonar[,-61]
+```
+
+# Exploratory Data Analysis {.tabset .tabset-fade}
+
+## Initial Visualization
+
+Without knowing anything about the data, my first 3 tasks are almost always:
+
+* Are there missing values, and what is the missing data profile?   
+* How does the categorical frequency for each discrete variable look like?  
+* What is the distribution of each continuous variable?
+
+
+The plot of missing data is not displayed because there is no missing data.  
+
+```{r plt_missing}
+# plot_missing(Sonar)
+```
+
+### Categorical Frequency
+
+
+The y-variable is well balanced across binary classes, e.g. rock or mine. Examining **Y** counts for the full data set is distributed as:
+
+* Mines 111 
+* Rocks 97
+
+```{r plt_bar,cache=cachePlot, fig.width=fig_width_7, fig.height=fig_height_5}
+plot_bar(Sonar)
+```
+
+
+### Continuous Distribution
+
+Univariate histograms. The x-variables are not normally distributed..
+
+
+```{r plt_cont,cache=cachePlot, eval=FALSE}
+plot_histogram(Sonar)
+```
+
+### Box-plots 
+
+Box-plots by Class label. Check for obviously different distribution of x-variables, by each class of Y.  
+
+```{r plt_boxplot,cache=cachePlot}
+plot_boxplot(Sonar, by="Class")
+
+# plot_scatterplot(Sonar, by="Class")
+```
+
+## Data Overview
+
+```{r, fig.height=4, fig.width=4}
+dat_summary <- dataOverview(Sonar,outlierMethod = "tukey")
+
+
+# Classification example:
+power <-  predictivePower(x = Sonar,
+                          y = "Class",
+                          outcomeType = "automatic")
+
+overview <- autoEDA(x=Sonar, y="Class")
+```
+
+## Bivariate Frequency Polygon
+
+There is significant overlap from the Rock/Mine signal on many of the predictor variables. It appears to be challenging to find strong predictors from a large portion of the variables. 
+
+```{r plt_bivar_freqpoly}
+ggplot(melt(Sonar[c(1:9,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.65, .1)) +
+  facet_wrap(~variable)
+
+ggplot(melt(Sonar[c(10:18,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(19:27,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(28:36,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
+  facet_wrap(~variable)
+
+
+
+ggplot(melt(Sonar[c(37:48,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 1, .25)) +
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(49:54,61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.2, .05)) +
+  facet_wrap(~variable)
+
+
+ggplot(melt(Sonar[c(55:61)], id.vars = "Class"), 
+       aes(x=value,colour=Class)) +  
+  geom_freqpoly(aes(y = ..density..)) +
+  scale_x_continuous(breaks = seq(0, 0.05, .01)) +
+  facet_wrap(~variable)
+
+
+
+```
+
+
+## Maximal Information Coefficient
+
+The "Maximal Information Coefficient" (MIC) is able to describe the correlation between paired variables regardless of linear or nonlinear relationship. 
+
+
+```{r mic_dat}
+micValues <- mine(x=Sonar[,-61],
+                  y = ifelse(Sonar$Class == "M", 1, 0), 
+                  alpha=0.7)
+
+# Analysis
+M <- micValues$MIC
+P <- cor(x=Sonar[,-61], y = ifelse(Sonar$Class == "M", 1, 0))
+
+res <- data.frame(MIC = c(micValues$MIC))
+# res <- data.frame(M)
+rownames(res) <- rownames(micValues$MIC)
+res$MIC_Rank <- nrow(res) - rank(res$MIC, ties.method="first") + 1
+res$Pearson <- P
+res$Pearson_Rank <- nrow(res) - rank(abs(res$Pearson), ties.method="first") + 1
+res <- res[order(res$MIC_Rank),]
+head(res, n=10)
+tail(res, n=10)
+```
+
+```{r plt_MIC}
+# Plot
+# png("MIC_vs_Pearson.png", width=7.5, height=3.5, res=400, units="in", type="cairo")
+op <- par(mfrow=c(1,2), mar=c(4,4,1,1))
+plot(MIC ~ abs(Pearson), res, pch=21,  col=4, bg=5)
+plot(MIC_Rank ~ Pearson_Rank, res, pch=21, col=4, bg=5)
+par(op)
+# dev.off()
+```
+
+### Correlation 
+
+```{r correlation,cache=cachePlot}
+
+plot_correlation(Sonar )
+
+```
+
+
+### Hierarchial Clustering
+
+```{r cluster_hier}
+# Dissimilarity matrix
+d = dist(t(X), method = "euclidean")
+
+# Hierarchical clustering using Complete Linkage
+hc1 = hclust(d, method = "complete" )
+
+# Apply Elbow rule
+fviz_nbclust(X, FUN = hcut, method = "wss") # It seems 4 - 6 groups may be appropriate
+
+# Plot dendrogram with 5 selected groups
+plot(hc1, cex = 0.6, hang = -1)
+rect.hclust(hc1, k = 5, border = 2:5)
+```
+
+# Caret Models
+
+
+```{r grouped_lasso}
+# source('/media/disc/Megasync/R/regularization/group_lasso/code/grouped_lasso.Rmd')
+
+```
+
+
+# Machine Learning  {.tabset .tabset-fade}
+
+The machine learning package H2O is leveraged using the R interface. 
+
+
+
+
+This child file `deep_learn_h20_roxy.R` uses roxygen formatting on a raw R file.
+
+```{r spin_DeepLearning, echo=TRUE, cache=cacheData}
+#spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/spinner_test.R')
+{{knitr::spin_child('/media/disc/Megasync/R/regularization/group_lasso/code/deep_learn_h20_roxy.R')}}
+```
+
+
+
+# Model Results  (MAIN doc)
+
+Comparing performance accuracy from models. 
+ 
+
+
+Model           |Accuracy                               | Run Time            |No. of Predictors|
+----------------|---------------------------------------|---------------------|-----------------|
+Decision Tree   | `r round(res.d.tree$overall[[1]],2)`  | `r round(time.dtree.diff,2)` | 6   |
+
+
+
+# References 
+
+
+* Gorman,  R.  P.,  and  Sejnowski,  T.  J.  (1988).   "Analysis  of  Hidden  Units  in  a  Layered  Network Trained to Classify Sonar Targets" in Neural Networks, Vol. 1, pp. 75-89.
+
+
+* [H2O Deep Learning][https://github.com/ahoffer/badger-beats] Liberal use of this GitHub page is utilized for the DeepLearning/H2O/Machine Learning section of this document.
+
+* [Maximal Information Coefficient][http://minepy.readthedocs.io/en/latest/details.html] http://www.exploredata.net/
+
+**Brief Review ROC plots.** 
+
+Explain ROC in terms of classifying rocks vs mines. The more tolerant you are of "slop" (false positives), the more you can be sure you aren't missing any true positives. The more willing you are to accept the computer misclassifying, the less likely you are to miss-classify a mine.
+
+PS: ROC curve technical background requires some understanding. I've been meaning to read these articles about it:
+
+* http://blogs.sas.com/content/iml/2011/07/29/computing-an-roc-curve-from-basic-principles.html
+
+* http://www.dataschool.io/roc-curves-and-auc-explained/
+
+## Run Time 
+
+1. Start time
+1. End time
+
+```{r runTime_main}
+st.time.0.main
+
+end.time.0.main <- Sys.time()
+end.time.0.main 
+
+end.time.0.main   - st.time.0.main  
+```
+
+**Document Settings **
+
+
+```{r project_directory}
+getwd()
+
+list.files(getwd())
+sessionInfo()
+
+```
+
+```{r R_code_main, ref.label=all_labels(),eval=FALSE,echo=TRUE}
+
+
+```
+
+

@@ -30,7 +30,7 @@ CODE.DIR <- paste(ROOT.DIR, "code", sep="")
 #' 
 
 #+ seed_number, echo=TRUE,cache=FALSE
-seed = 0
+seed = 77
 set.seed(seed)
 
 
@@ -214,19 +214,36 @@ print(g)
 
 
 #+ decision_tree, echo=TRUE, cache=FALSE
-decisionTree = train(Class ~ .,  sonar.train.df, method="ctree")
-# Visually inspect the tree.
-plot(decisionTree$finalModel)
+run.DTREE = 0
+if(run.DTREE == 1){
+  time.dtree.fit <- Sys.time()
+  fit.d.tree = train(Class ~ .,  sonar.train.df, method="ctree")
+  time.dtree.end <- Sys.time()
+  time.dtree.diff <- time.dtree.end - time.dtree.fit
+  
+  saveRDS(time.dtree.diff, file = paste(DATA.DIR, "time.dtree.diff.rds", sep="/"))
+  save(fit.d.tree,
+       file = paste(DATA.DIR, "fit.d.tree.Rdata", sep="/"))
+  saveRDS(fit.d.tree,
+          file = paste(DATA.DIR, "fit.d.tree.rds", sep="/") )  
+}
+#
+time.dtree.diff <- readRDS(file = paste(DATA.DIR, "time.dtree.diff.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.d.tree.Rdata", sep="/"))
+
+
+
+#' Visually inspect the tree.
+plot(fit.d.tree$finalModel)
 
 
 #' Evaluate the decision tree performance
 #' 
 
 #+ decision_tree_results, cache=FALSE, echo=TRUE
-decisionTree.predictions = predict(decisionTree, sonar.test.df[, -classVariableIndex])
-confusionMatrix(
-  decisionTree.predictions,
-  sonar.test.df$Class)
+pred.d.tree = predict(fit.d.tree, sonar.test.df[, -classVariableIndex])
+res.d.tree <- caret::confusionMatrix(pred.d.tree, sonar.test.df$Class)
 
 
 #' ## AUC results
@@ -235,10 +252,10 @@ confusionMatrix(
 #' 
 
 #+ auc_results, fig.height=5, fig.width=5, echo=TRUE, cache=FALSE
-decisionTree.predictions.probabilities=predict(decisionTree, sonar.test.df[, -classVariableIndex], type="prob")
-decisionTree.roc=roc(sonar.test.df$Class, decisionTree.predictions.probabilities$M)
+pred.d.tree.probabilities=predict(fit.d.tree, sonar.test.df[, -classVariableIndex], type="prob")
+d.tree.roc=roc(sonar.test.df$Class, pred.d.tree.probabilities$M)
 # Area under the curve: 0.8433
-plot(decisionTree.roc)
+plot(d.tree.roc)
 
 
 
@@ -272,10 +289,10 @@ h2o.performance(m.rf0, sonar.test)
 
 
 
-#+ fit_compare, echo=TRUE
+#+ fit_compare, echo=TRUE, eval=FALSE
 res <- compareModels(c(m.gbm0, m.rf0), sonar.test)
 round(res[,"AUC",], 3)
-
+#
 compareModels <- function(models, test, labels = NULL){
   #Use model IDs as default labels, if not given  
   if(is.null(labels)){
@@ -311,39 +328,6 @@ compareModels <- function(models, test, labels = NULL){
 }
 
 
-compareModels <- function(models, test, labels=NULL){
-  if(is.null(labels)){
-    labels <- lapply(models, function(m) m@model_id)
-  }
-  
-  res <- sapply(models, function(m){
-    mcmsT <- m@model$training_metrics@metrics$max_criteria_and_metric_scores
-    mcmsV <- m@model$validation_metrics@metrics$max_criteria_and_metric_scores
-    maix <- which(mcmsT$metric=="max accuracy")
-    th <- mean(mcmsT[maix, 'threshold'], mcmsV[maix,'threshold'])
-    
-    pf <- h2o.performance(m, test)
-    tms <- pf@metrics$thresholds_and_metric_scores
-    ix <- apply(outer(th, tms$threshold, "<="),1, sum)
-    if(ix < 1)ix <- 1
-    
-    matrix(c(
-      h2o.auc(m, TRUE, TRUE), pf@metrics$AUC,
-      mcmsT[maix, 'value'], mcmsV[maix, 'value'], tms[ix, 'accuracy'],
-      h2o.logloss(m, TRUE, TRUE), pf@metrics$logloss,
-      h2o.mse(m, TRUE, TRUE), pf@metrics$MSE
-    ), ncol = 4)
-  }, simplify = "array")
-  
-  dimnames(res) <- list(
-    c("train", "valid", "test"),
-    c("AUC", "Accuracy", "logloss", "MSE"),
-    labels
-  )
-  
-  res
-}
-
 
 #' ## GLM
 #' 
@@ -376,7 +360,3 @@ dl.fit <- h2o.experiment(h2o.deeplearning)
 
 
 
-#' ## Model Results
-#' 
-#' Comparing performance accuracy from models run in h2o. 
-#' 

@@ -1,45 +1,25 @@
----
-title: "MAT976 - Group LASSO"
-author: "Trent Lemkus"
-date: "2018 May 7"
-output:
-  html_document
----
-
-# Document Updated last:
-
-```{r stTime, echo=TRUE}
-stTime <- Sys.time()
-stTime 
-```
+# Chapter 2: Grouped Lasso
 
 ```{r setup, include=FALSE}
+stTime <- Sys.time()
+
 # Load Packages
 pkg <- c("ggplot2", "knitr", "markdown", "glmnet", "caret", "gglasso", "corrplot","RColorBrewer","zoo", "factoextra", "mlbench", "rlang")
 
 sapply(pkg, require, character.only = TRUE)
 
 # Knitr Options
-knitr::opts_chunk$set(progress = TRUE,
-                      fig.width=11,
-                      fig.height=6,
-                      echo = FALSE,
-                      message = FALSE, 
-                      warning = FALSE,
-                      fig.align = "center",
-                      cache = TRUE, 
-                      cache.lazy = TRUE, 
-                      tidy=TRUE, 
-                      tidy.opts=list(blank=TRUE, width.cutoff=65) )
+knitr::opts_chunk$set(progress = TRUE, fig.width=11, fig.height=6, echo = FALSE, message = FALSE, warning = FALSE, fig.align = "center", cache = TRUE,  cache.lazy = TRUE,  tidy=TRUE, tidy.opts=list(blank=TRUE, width.cutoff=65) )
 
 
 # Setup logical directory structure
 ROOT.DIR <- "/media/disc/Megasync/R/regularization/group_lasso/"
 DATA.DIR <- paste(ROOT.DIR,"data",sep="")
+CHART.DIR <- paste(ROOT.DIR, "charts", sep="")
 CODE.DIR <- paste(ROOT.DIR, "code", sep="")
 ```
 
-\newpage
+
 
 ------------------------------------------------------      
 # Abstract
@@ -121,6 +101,9 @@ data(Sonar)
 
 # Investigate Sonar Data Set
 # str(Sonar)
+
+seed = 777
+set.seed(seed)
 ```
        
 ## Why Use A Group LASSO?         
@@ -188,7 +171,9 @@ We split the data set into a 90/10 train-test split. The main reason for this ty
            
 ```{r warning = FALSE, message = FALSE, cache = TRUE}
 # Create a 90/10 Train Test Split
-set.seed(777)
+# set.seed(777)
+
+
 trainIndex <- createDataPartition(y, p = .9, 
                                   list = FALSE, 
                                   times = 1)
@@ -240,24 +225,43 @@ mlp_grid = expand.grid(.layer1 = layer1,
                        .layer3 = layer3)
 
 # Train Model
-set.seed(1)
-start.time.mlp <- Sys.time()
-fit.mlp = caret::train(x = data.matrix(X_train),
-                y = y_train, 
-                method = "mlpML", 
-                #trControl = trnCtrl,
-                #act.fct = 'logistic',
-                tuneGrid = mlp_grid,
-                standardize = FALSE)
-end.time.mlp <- Sys.time()
-time.taken.mlp <- end.time.mlp - start.time.mlp
+run.MLP = 0
+if(run.MLP == 1){
+  set.seed(1)
+  start.time.mlp <- Sys.time()
+  fit.mlp = caret::train(x = data.matrix(X_train),
+                         y = y_train, 
+                         method = "mlpML", 
+                         #trControl = trnCtrl,
+                         #act.fct = 'logistic',
+                         tuneGrid = mlp_grid,
+                         standardize = FALSE)
+  
+  end.time.mlp <- Sys.time()
+  time.taken.mlp <- end.time.mlp - start.time.mlp 
+  
+  
+  saveRDS(time.taken.mlp,
+          file = paste(DATA.DIR, "time.taken.mlp.rds", sep="/"))
+  save(fit.mlp,
+       file = paste(DATA.DIR, "fit.mlp.Rdata", sep="/"))
+  saveRDS(fit.mlp,
+          file = paste(DATA.DIR, "fit.mlp.rds", sep="/") )
+}
+
+
+time.taken.mlp <- readRDS(file = paste(DATA.DIR, "time.taken.mlp.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.mlp.Rdata", sep="/"))
+
+
 # Plot and Model Details
 #plot(my.train)
 best.params = fit.mlp$bestTune
 my.mlp.model <- fit.mlp$finalModel
 # Prediction on Test Set
 pred.mlp = predict(fit.mlp, newdata = data.matrix(X_test))
-mlp_matrix = confusionMatrix(pred.mlp, y_test)
+mlp_matrix <- caret::confusionMatrix(pred.mlp, y_test)
 ```
 
 ```{r lasso_fit, warning = FALSE, message = FALSE, cache = TRUE}
@@ -277,22 +281,42 @@ trnCtrl = trainControl(
   repeats = 5)
 
 # Train Model
-set.seed(2)
-start.time.L <- Sys.time()
-fit.LASSO <- caret::train(x = data.matrix(X_train),
-                  y = y_train,
-                  method = "glmnet",
-                  tuneGrid = srchGrd,
-                  trControl = trnCtrl,
-                  standardize = FALSE)
-end.time.L <- Sys.time()
-time.taken.L <- end.time.L - start.time.L
+run.LASSO = 0
+if(run.LASSO == 1){
+  set.seed(seed)
+  start.time.L <- Sys.time()
+  
+  fit.LASSO <- caret::train(x = data.matrix(X_train),
+                            y = y_train,
+                            method = "glmnet",
+                            tuneGrid = srchGrd,
+                            trControl = trnCtrl,
+                            standardize = FALSE)
+  
+  
+  end.time.L <- Sys.time()
+  time.taken.L <- end.time.L - start.time.L
+
+
+  saveRDS(time.taken.L,
+          file = paste(DATA.DIR, "time.taken.L.rds", sep="/"))
+  save(fit.LASSO,
+       file = paste(DATA.DIR, "fit.LASSO.Rdata", sep="/"))
+  saveRDS(fit.LASSO,
+          file = paste(DATA.DIR, "fit.LASSO.rds", sep="/") )
+}
+
+time.taken.L <- readRDS(file = paste(DATA.DIR, "time.taken.L.rds", sep="/"))
+# fit.LASSO <- readRDS(file = paste(DATA.DIR, "fit.LASSO.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.LASSO.Rdata", sep="/"))
+
+
 # Plot and Model Details
 best.params = fit.LASSO$bestTune
 my.LASSO.model <- fit.LASSO$finalModel
 # Prediction on Test Set
 pred.LASSO = predict(fit.LASSO, newdata = data.matrix(X_test))
-LASSO_matrix = confusionMatrix(pred.LASSO, y_test)
+LASSO_matrix <- caret::confusionMatrix(pred.LASSO, y_test)
 #######################################
 ## Elastic Net (tuned alpha)
 #######################################
@@ -309,23 +333,43 @@ trnCtrl = trainControl(
   repeats = 5)
 
 # Train Model
-set.seed(3)
-start.time.EN <- Sys.time()
-fit.glmN <- train(x = data.matrix(X_train),
-                  y = y_train,
-                  method = "glmnet",
-                  tuneGrid = srchGrd,
-                  trControl = trnCtrl,
-                  standardize = FALSE)
-end.time.EN <- Sys.time()
-time.taken.EN <- end.time.EN - start.time.EN
+run.fit.glmN = 0
+if(run.fit.glmN == 1){
+  # set.seed(3)
+  set.seed(seed)
+  start.time.EN <- Sys.time()
+  fit.glmN <- caret::train(x = data.matrix(X_train),
+                           y = y_train,
+                           method = "glmnet",
+                           tuneGrid = srchGrd,
+                           trControl = trnCtrl,
+                           standardize = FALSE)
+  
+  end.time.EN <- Sys.time()
+  time.taken.EN <- end.time.EN - start.time.EN
+
+  saveRDS(time.taken.EN,
+          file = paste(DATA.DIR, "time.taken.EN.rds", sep="/"))
+  save(fit.glmN,
+       file = paste(DATA.DIR, "fit.glmN.Rdata", sep="/"))
+  saveRDS(fit.glmN,
+          file = paste(DATA.DIR, "fit.glmN.rds", sep="/") )
+  }
+
+
+
+time.taken.EN <- readRDS(file = paste(DATA.DIR, "time.taken.EN.rds", sep="/"))
+# fit.glmN <- readRDS(file = paste(DATA.DIR, "fit.glmN.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.glmN.Rdata", sep="/"))
+
+
 # Plot and Model Details
 #plot(fit.glmN)
 best.params = fit.glmN$bestTune
 my.glmnet.model <- fit.glmN$finalModel
 # Prediction on Test Set
 pred.glmnet = predict(fit.glmN, newdata = data.matrix(X_test))
-glmN_matrix = confusionMatrix(pred.glmnet, y_test)
+glmN_matrix = caret::confusionMatrix(pred.glmnet, y_test)
 
 #######################################
 ## Group LASSO
@@ -333,34 +377,77 @@ glmN_matrix = confusionMatrix(pred.glmnet, y_test)
 # Cross Validation (This can take a substantial amount of time - around 45 mins)
 X_train = as.matrix(X_train)
 y_train = ifelse(y_train == "M", 1 , -1) # Binary Factor needs to be numeric {-1,1} format
-set.seed(4)
-start.time.GLASSO <- Sys.time()
-fit.GLASSO=cv.gglasso(x=X_train,y=y_train,group=grp, 
-                      loss="logit",
-                      pred.loss="L1", # Penalized Logistic Regression
-                      nfolds=10) 
-end.time.GLASSO <- Sys.time()
-time.taken.GLASSO <- end.time.GLASSO - start.time.GLASSO
+
+run.GLASSO = 0 
+if(run.GLASSO == 1){
+  # set.seed(4)
+  set.seed(seed)
+  start.time.GLASSO <- Sys.time()
+  fit.GLASSO=cv.gglasso(x=X_train,
+                        y=y_train,
+                        group=grp, 
+                        loss="logit",
+                        pred.loss="L1", # Penalized Logistic Regression
+                        nfolds=10) 
+  
+  end.time.GLASSO <- Sys.time()
+  time.taken.GLASSO <- end.time.GLASSO - start.time.GLASSO
+  
+  saveRDS(time.taken.GLASSO,
+          file = paste(DATA.DIR, "time.taken.GLASSO.rds", sep="/"))
+  save(fit.GLASSO,
+       file = paste(DATA.DIR, "fit.GLASSO.Rdata", sep="/"))
+  saveRDS(fit.GLASSO,
+          file = paste(DATA.DIR, "fit.GLASSO.rds", sep="/") )
+  }
+
+time.taken.GLASSO <- readRDS(file = paste(DATA.DIR, 
+                                          "time.taken.GLASSO.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.GLASSO.Rdata", sep="/"))
+
+
 
 # Prediction
 pred.gglasso = predict(fit.GLASSO, newx = data.matrix(X_test), 
                        s = "lambda.min", type = "class")
 pred.gglasso = ifelse(pred.gglasso == 1, "M", "R")
 pred.gglasso = as.factor(pred.gglasso)
-GLASSO_matrix = confusionMatrix(pred.gglasso, y_test)
+GLASSO_matrix = caret::confusionMatrix(pred.gglasso, y_test)
 
 #######################################
 # Group Ridge
 #######################################
 # Cross Validation (This can take several minutes)
-set.seed(5)
-start.time.RLASSO <- Sys.time()
-fit.cv.ridge=cv.gglasso(x=X_train,y=y_train,group=grp, 
-                        loss="logit",
-                        pred.loss="L2", # Penalized Logistic Regression
-                        nfolds=10)
-end.time.RLASSO <- Sys.time()
-time.taken.RLASSO <- end.time.RLASSO - start.time.RLASSO
+
+run.RLASSO = 0
+if(run.RLASSO == 1){
+  # set.seed(5)
+  set.seed(seed)
+  start.time.RLASSO <- Sys.time()
+  fit.cv.ridge = cv.gglasso(x=X_train, 
+                            y=y_train, 
+                            group=grp, 
+                            loss="logit",
+                            pred.loss="L2", # Penalized Logistic Regression
+                            nfolds=10)
+  
+  end.time.RLASSO <- Sys.time()
+  time.taken.RLASSO <- end.time.RLASSO - start.time.RLASSO
+  
+  
+  saveRDS(time.taken.RLASSO, 
+          file = paste(DATA.DIR, "time.taken.RLASSO.rds", sep="/"))
+  save(fit.cv.ridge, 
+       file = paste(DATA.DIR, "fit.cv.ridge.Rdata", sep="/"))
+  saveRDS(fit.cv.ridge, 
+          file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/") )
+}
+
+
+time.taken.RLASSO <- readRDS(file = paste(DATA.DIR, "time.taken.RLASSO.rds", sep="/"))
+# fit.cv.ridge <- readRDS(file = paste(DATA.DIR, "fit.cv.ridge.rds", sep="/"))
+load(file = paste(DATA.DIR, "fit.cv.ridge.Rdata", sep="/"))
 
 # Best Lambda
 lmbda=fit.cv.ridge$lambda.min
@@ -370,12 +457,14 @@ pred.gglasso.L2 = predict(fit.cv.ridge, newx = data.matrix(X_test),
                        s = "lambda.min", type = "class")
 pred.gglasso.L2 = ifelse(pred.gglasso.L2 == 1, "M", "R")
 pred.gglasso.L2 = as.factor(pred.gglasso.L2)
-RGroup_matrix = confusionMatrix(pred.gglasso.L2, y_test)
+RGroup_matrix = caret::confusionMatrix(pred.gglasso.L2, y_test)
 ```
               
-### Time Comparison   
+### Time Comparison (GROUPED LASSO doc)  
              
-Below is a table comparing all 5 models:              
+Compare model results:              
+
+            
          
 Model           |Accuracy                      | Run Time            |No. of Predictors|
 ----------------|------------------------------|---------------------|-----------------|
@@ -383,7 +472,9 @@ MLP             |`r mlp_matrix$overall[[1]]`   |`r round(time.taken.mlp,2)`   |`
 LASSO           |`r LASSO_matrix$overall[[1]]` |`r round(time.taken.L,2)`     |`r sum(coef(my.LASSO.model, s = fit.LASSO$bestTune$lambda)[-1]!=0)`|
 Elastic Net     |`r glmN_matrix$overall[[1]]`  |`r round(time.taken.EN,2)`    |`r sum(coef(my.glmnet.model, s = fit.glmN$bestTune$lambda)[-1]!=0)`|
 Group LASSO     |`r GLASSO_matrix$overall[[1]]`|`r round(time.taken.GLASSO,2)`|`r sum(coef(fit.GLASSO)[-1]!=0)`   |
-Group Ridge     |`r RGroup_matrix$overall[[1]]`|`r round(time.taken.RLASSO,2)`|60   |        
+Group Ridge     |`r RGroup_matrix$overall[[1]]`|`r round(time.taken.RLASSO,2)`|60   |   
+Decision Tree   | `r round(res.d.tree$overall[[1]],2)`  | `r round(time.dtree.diff,2)` | 6   |
+      
            
 **Analysis**             
           
@@ -397,7 +488,14 @@ The outright winner if run time is the exclusive concern would typically be the 
             
 ```{r plot_lasso, warning = FALSE, message = FALSE, cache = TRUE}
 # LASSO CV Plot
+# plot(fit.LASSO)
+
+
+svg(file = paste(CHART.DIR, "fit.LASSO.svg", sep="/"), width = 8, height =6, pointsize=12)
 plot(fit.LASSO)
+# mtext(adj=0, side=3 , 
+      # text=expression(bold(paste("LASSO Cross Validation - ", (beta)," * SPY"))))
+dev.off()
 ```
           
 The accuracy of the LASSO model is highest when there is no coefficient shrinkage. This is to be expected from the multicollinearity issue we had previously assessed and described above.         
@@ -436,7 +534,7 @@ Once again we see a similar plot to that of the LASSO where all the repeated CV 
          
 **MLP**         
      
-```{r warning = FALSE, message = FALSE, cache = TRUE}
+```{r MLP.matrix, warning = FALSE, message = FALSE, cache = TRUE}
 # Confusion Matrices
 mlp_matrix
 ```
@@ -444,28 +542,28 @@ mlp_matrix
 
 **LASSO**         
      
-```{r warning = FALSE, message = FALSE, cache = TRUE}
+```{r LASSO.matrix, warning = FALSE, message = FALSE, cache = TRUE}
 LASSO_matrix
 ```
 
 
 **Eslastic Net**         
      
-```{r warning = FALSE, message = FALSE, cache = TRUE}
+```{r glmN.matrix, warning = FALSE, message = FALSE, cache = TRUE}
 glmN_matrix
 ```
 
 
 **Group LASSO**         
      
-```{r warning = FALSE, message = FALSE, cache = TRUE}
+```{r GLASSO.matrix, warning = FALSE, message = FALSE, cache = TRUE}
 GLASSO_matrix
 ```
 
 
 **Ridge Group**         
      
-```{r warning = FALSE, message = FALSE, cache = TRUE}
+```{r RGroup.matrix, warning = FALSE, message = FALSE, cache = TRUE}
 RGroup_matrix
 ```
            
@@ -480,7 +578,20 @@ The Group LASSO not only achieves sparsity, but it does so with the highest accu
 [3] Gorman, R. P., and Sejnowski, T. J. (1988). "Analysis of Hidden Units in a Layered Network Trained to Classify Sonar Targets" in Neural Networks, Vol. 1, pp. 75-89.               
 [4] Newman, D.J. & Hettich, S. & Blake, C.L. & Merz, C.J. (1998). UCI Repository of machine learning databases [http://www.ics.uci.edu/~mlearn/MLRepository.html]. Irvine, CA: University of California, Department of Information and Computer Science.             
            
-          
+
+## Document Settings  
+
+* Document date of last update
+
+
+```{r doc_run_time, echo=TRUE}
+stTime 
+
+endTime <- Sys.time()
+endTime
+
+endTime   - stTime
+```
 ## R Code for Report
 
 

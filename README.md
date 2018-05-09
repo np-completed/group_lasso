@@ -43,10 +43,10 @@ is located.
    `H2O`.File uses roxygen formatting.
   * deep_learn_h2o_plain.R  A non-roxygen version kept as backup, just in case.
   * helper_h2o.R
-  * grp_lasso.Rmd    **Main File** Parent (main) file aggregates child R files.    
-  * grp_lasso.html
-  * grp_lasso_cache/html  Cache files are ignored to save space on GitHub.
-  * grp_lasso_files/figure-html Many plots are ignored, to save space.
+  * main.Rmd    **Main File** Parent (main) file aggregates child R files.    
+  * main.html
+  * main_cache/html  Cache files are ignored to save space on GitHub.
+  * main_files/figure-html Many plots are ignored, to save space.
 
 # requirements
 
@@ -54,8 +54,12 @@ is located.
 The knitr md file `group_lasso` generated the HTML output using R libraries:
 `group_lasso/code/grp_lasso_cache/html/__packages` . All bleeding edge packages also have install directions shown in the `.Rmd` file. Typically `library(devtools)` and `install_github(foo_bar/magick)` .
 
+# Roxygen
 
-# Roxygen formatting
+The main file `main.Rmd` imports all R{MD} script(s) and generates a unified output. The child files can be buggy, predictably tables and charts, but there are many benefits to logical compartmentalizing scripts.
+
+
+## Roxygen formatting
 
 R files formatted using roxygen can be rendered using pandoc, command line
  arguments using a bash shell OR R. Most markdown effects persist, however
